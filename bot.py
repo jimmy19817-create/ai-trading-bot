@@ -1,9 +1,11 @@
 import os
 import ccxt
 from groq import Groq
+from tavily import TavilyClient
 
-# Configurazione
+# Configurazione Clienti
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+tavily = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
 exchange = ccxt.bitget({
     'apiKey': os.environ.get("BINANCE_API_KEY"),
     'secret': os.environ.get("BINANCE_SECRET_KEY"),
@@ -12,65 +14,61 @@ exchange = ccxt.bitget({
 })
 exchange.set_sandbox_mode(True)
 
-def get_history():
-    """Scarica le ultime 24 candele per dare il contesto del trend all'IA."""
-    print("Recupero dati storici per l'analisi del grafico...")
-    ohlcv = exchange.fetch_ohlcv('BTC/USDT', '1h', limit=24)
-    history_str = "Trend delle ultime 24 ore (Chiusura Prezzo):\n"
-    for candle in ohlcv:
-        history_str += f"{candle[4]} USD\n"
-    return history_str
+def get_market_context():
+    """Scarica il grafico e le news/social in un colpo solo."""
+    print("Analizzando grafico e trend su X/News...")
+    # 1. Grafico
+    ohlcv = exchange.fetch_ohlcv('BTC/USDT', '1h', limit=12)
+    chart = "\n".join([f"Prezzo: {c[4]} USD" for c in ohlcv])
+    
+    # 2. Social/News (Il tocco di Grok)
+    search = tavily.search(query="Bitcoin price sentiment X twitter news latest", search_depth="advanced", max_results=3)
+    context = "\n".join([f"- {r['content'][:200]}" for r in search['results']])
+    
+    return chart, context
 
-def get_ai_decision(history, current_price):
-    # AGGIORNAMENTO: Usiamo il modello più recente disponibile su Groq
-    # Se questo dovesse fallire in futuro, controlla i nomi su console.groq.com
-    target_model = "llama-3.3-70b-versatile" 
-    
+def get_ai_decision(chart, news, price):
     prompt = f"""
-    Sei un trader esperto. Analizza questo grafico testuale (ultime 24 ore):
-    {history}
+    SEI UN TRADER AGGRESSIVO TIPO GROK.
+    PREZZO ATTUALE: {price} USD.
     
-    Prezzo ATTUALE: {current_price} USD.
+    GRAFICO ULTIME 12H:
+    {chart}
     
-    Decidi se COMPRARE, VENDERE o ATTENDERE basandoti sul trend.
-    Rispondi SOLO con la parola magica: COMPRA, VENDI o ATTENDI.
+    NEWS E SENTIMENT SOCIAL (X):
+    {news}
+    
+    Basandoti su questi dati, devi decidere la mossa per il nostro fondo da 10.000$.
+    Sii proattivo: se le news sono eccitanti, COMPRA. Se c'è paura, VENDI.
+    Rispondi SOLO con: COMPRA, VENDI o ATTENDI.
     """
-    
-    try:
-        chat = groq_client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=target_model,
-        )
-        return chat.choices[0].message.content.strip().upper()
-    except Exception as e:
-        print(f"Errore chiamata IA: {e}")
-        return "ATTENDI"
+    chat = groq_client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama-3.3-70b-versatile",
+    )
+    return chat.choices[0].message.content.strip().upper()
 
 def main():
     try:
         exchange.load_markets()
-        ticker = exchange.fetch_ticker('BTC/USDT')
-        current_price = ticker['last']
-        chart_data = get_history()
+        price = exchange.fetch_ticker('BTC/USDT')['last']
+        chart, news = get_market_context()
         
-        print(f"--- Analisi con Grafico e Nuovo Modello ---")
-        print(f"Prezzo: ${current_price}")
+        print(f"--- Report Strategico Integrato ---")
+        decision = get_ai_decision(chart, news, price)
+        print(f"L'IA ha deciso: {decision}")
 
-        decision = get_ai_decision(chart_data, current_price)
-        print(f"L'IA ha analizzato il trend e dice: {decision}")
-
-        # Esecuzione (piccola quota di test: 0.001 BTC)
         if "COMPRA" in decision:
-            order = exchange.create_market_buy_order('BTC/USDT', 0.001)
-            print(f"✅ ORDINE ACQUISTO: {order['id']}")
+            order = exchange.create_market_buy_order('BTC/USDT', 0.002) # Circa 150$ di test
+            print(f"🚀 ORDINE ESEGUITO: {order['id']}")
         elif "VENDI" in decision:
-            order = exchange.create_market_sell_order('BTC/USDT', 0.001)
-            print(f"✅ ORDINE VENDITA: {order['id']}")
+            order = exchange.create_market_sell_order('BTC/USDT', 0.002)
+            print(f"📉 VENDITA ESEGUITA: {order['id']}")
         else:
-            print("💤 Nessuna operazione: l'IA preferisce aspettare un segnale migliore.")
+            print("💤 L'IA non vede opportunità né nei grafici né nei social.")
 
     except Exception as e:
-        print(f"Errore critico: {e}")
+        print(f"Errore: {e}")
 
 if __name__ == "__main__":
     main()
