@@ -13,67 +13,64 @@ exchange = ccxt.bitget({
 exchange.set_sandbox_mode(True)
 
 def get_history():
-    """Scarica le ultime 24 candele da 1 ora per dare il 'grafico' all'IA."""
-    print("Scarico i dati del grafico...")
-    # '1h' significa candele orarie, limit=24 sono le ultime 24 ore
+    """Scarica le ultime 24 candele per dare il contesto del trend all'IA."""
+    print("Recupero dati storici per l'analisi del grafico...")
     ohlcv = exchange.fetch_ohlcv('BTC/USDT', '1h', limit=24)
-    
-    # Formattiamo i dati per renderli leggibili all'IA
-    history_str = "Prezzi delle ultime 24 ore (Chiusura, Volume):\n"
+    history_str = "Trend delle ultime 24 ore (Chiusura Prezzo):\n"
     for candle in ohlcv:
-        history_str += f"Prezzo: {candle[4]} USD, Vol: {candle[5]}\n"
+        history_str += f"{candle[4]} USD\n"
     return history_str
 
 def get_ai_decision(history, current_price):
+    # AGGIORNAMENTO: Usiamo il modello più recente disponibile su Groq
+    # Se questo dovesse fallire in futuro, controlla i nomi su console.groq.com
+    target_model = "llama-3.3-70b-versatile" 
+    
     prompt = f"""
-    Sei un trader professionista. Ecco il grafico (dati storici) di Bitcoin delle ultime 24 ore:
+    Sei un trader esperto. Analizza questo grafico testuale (ultime 24 ore):
     {history}
     
-    Il prezzo ATTUALE è: {current_price} USD.
+    Prezzo ATTUALE: {current_price} USD.
     
-    Analizza il trend: il prezzo sta salendo o scendendo? C'è molto volume?
-    Basandoti su questo 'grafico' testuale, decidi la prossima mossa per il nostro fondo da 10.000$.
-    Rispondi SOLO con una parola: COMPRA, VENDI o ATTENDI.
+    Decidi se COMPRARE, VENDERE o ATTENDERE basandoti sul trend.
+    Rispondi SOLO con la parola magica: COMPRA, VENDI o ATTENDI.
     """
     
-    chat = groq_client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama3-70b-8192",
-    )
-    return chat.choices[0].message.content.strip().upper()
+    try:
+        chat = groq_client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=target_model,
+        )
+        return chat.choices[0].message.content.strip().upper()
+    except Exception as e:
+        print(f"Errore chiamata IA: {e}")
+        return "ATTENDI"
 
 def main():
     try:
         exchange.load_markets()
-        
-        # 1. Otteniamo il prezzo attuale
         ticker = exchange.fetch_ticker('BTC/USDT')
         current_price = ticker['last']
-        
-        # 2. Otteniamo lo storico (il "grafico")
         chart_data = get_history()
         
-        print(f"--- Analisi Avanzata ---")
-        print(f"Prezzo Attuale: ${current_price}")
+        print(f"--- Analisi con Grafico e Nuovo Modello ---")
+        print(f"Prezzo: ${current_price}")
 
-        # 3. Decisione basata sul grafico
         decision = get_ai_decision(chart_data, current_price)
-        print(f"L'IA ha analizzato il grafico e deciso di: {decision}")
+        print(f"L'IA ha analizzato il trend e dice: {decision}")
 
-        # 4. Esecuzione (Esempio 100$ di operazione)
+        # Esecuzione (piccola quota di test: 0.001 BTC)
         if "COMPRA" in decision:
-            amount = 100 / current_price
-            order = exchange.create_market_buy_order('BTC/USDT', amount)
-            print(f"ORDINE DI ACQUISTO ESEGUITO! ID: {order['id']}")
+            order = exchange.create_market_buy_order('BTC/USDT', 0.001)
+            print(f"✅ ORDINE ACQUISTO: {order['id']}")
         elif "VENDI" in decision:
-            amount = 100 / current_price
-            order = exchange.create_market_sell_order('BTC/USDT', amount)
-            print(f"ORDINE DI VENDITA ESEGUITO! ID: {order['id']}")
+            order = exchange.create_market_sell_order('BTC/USDT', 0.001)
+            print(f"✅ ORDINE VENDITA: {order['id']}")
         else:
-            print("L'IA consiglia di non operare basandosi sul trend attuale.")
+            print("💤 Nessuna operazione: l'IA preferisce aspettare un segnale migliore.")
 
     except Exception as e:
-        print(f"Errore: {e}")
+        print(f"Errore critico: {e}")
 
 if __name__ == "__main__":
     main()
