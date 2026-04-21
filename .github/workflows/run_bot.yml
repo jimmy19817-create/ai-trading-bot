@@ -1,18 +1,24 @@
 name: AI Trading Bot
 on:
   schedule:
-    - cron: '0 * * * *' # Il bot girerà automaticamente ogni ora
-  workflow_dispatch:      # Questo ti permette di farlo partire a mano per testare
+    - cron: '0 * * * *' 
+  workflow_dispatch:      
+
+env:
+  # Questa riga risolve l'avviso che hai visto
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   trading:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del codice
-        uses: actions/checkout@v4
+        # Aggiornato alla v5 (o superiore per Node 24)
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        # Aggiornato alla v6
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
