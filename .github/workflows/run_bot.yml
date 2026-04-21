@@ -23,7 +23,7 @@ jobs:
           python-version: '3.10'
 
       - name: Installazione Librerie
-        run: pip install ccxt groq
+        run: pip install ccxt groq tavily-python
 
       - name: Esecuzione Bot
         env:
@@ -31,4 +31,5 @@ jobs:
           BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
           BINANCE_SECRET_KEY: ${{ secrets.BINANCE_SECRET_KEY }}
           BITGET_PASSWORD: ${{ secrets.BITGET_PASSWORD }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
         run: python bot.py
