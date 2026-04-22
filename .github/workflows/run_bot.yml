@@ -15,11 +15,11 @@ jobs:
     steps:
       - name: Checkout del codice
         # v4 o v5 vanno benissimo, sono le versioni stabili
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
         # Usiamo la v5 o v6 per massima compatibilità con Node 24
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # FONDAMENTALE: Usiamo 3.11 per far funzionare pandas-ta senza errori
           python-version: '3.11'
