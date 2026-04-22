@@ -1,11 +1,12 @@
 name: AI Trading Bot
+
 on:
   schedule:
-    - cron: '0 * * * *' 
-  workflow_dispatch:      
+    - cron: '0 * * * *' # Gira ogni ora esatta
+  workflow_dispatch: # Ti permette di lanciarlo a mano per testare
 
 env:
-  # Questa riga risolve l'avviso che hai visto
+  # Obbligatorio nel 2026 per evitare avvisi di obsolescenza su Node.js
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -13,17 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout del codice
-        # Aggiornato alla v5 (o superiore per Node 24)
-        uses: actions/checkout@v5
+        # v4 o v5 vanno benissimo, sono le versioni stabili
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        # Aggiornato alla v6
-        uses: actions/setup-python@v6
+        # Usiamo la v5 o v6 per massima compatibilità con Node 24
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          # FONDAMENTALE: Usiamo 3.11 per far funzionare pandas-ta senza errori
+          python-version: '3.11'
 
       - name: Installazione Librerie
-        run: pip install ccxt groq tavily-python pandas pandas_ta
+        # Nota: usiamo il trattino 'pandas-ta' per l'installazione, è più sicuro
+        run: |
+          pip install --upgrade pip
+          pip install ccxt groq tavily-python pandas pandas-ta
 
       - name: Esecuzione Bot
         env:
