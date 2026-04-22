@@ -23,7 +23,7 @@ jobs:
           python-version: '3.10'
 
       - name: Installazione Librerie
-        run: pip install ccxt groq tavily-python
+        run: pip install ccxt groq tavily-python pandas pandas_ta
 
       - name: Esecuzione Bot
         env:
