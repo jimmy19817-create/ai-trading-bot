@@ -2,12 +2,16 @@ import os
 import ccxt
 import pandas as pd
 import pandas_ta as ta
+import requests
 from groq import Groq
 from tavily import TavilyClient
 
-# Inizializzazione
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 tavily = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
+# Telegram Config
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
 exchange = ccxt.bitget({
     'apiKey': os.environ.get("BINANCE_API_KEY"),
     'secret': os.environ.get("BINANCE_SECRET_KEY"),
@@ -16,6 +20,16 @@ exchange = ccxt.bitget({
     'options': {'createMarketBuyOrderRequiresPrice': False}
 })
 exchange.set_sandbox_mode(True)
+
+def send_telegram_message(message):
+    """Invia una notifica su Telegram."""
+    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+        try:
+            requests.post(url, json=payload)
+        except Exception as e:
+            print(f"Errore invio Telegram: {e}")
 
 def calculate_mcdx_proxy(df):
     """Simula l'MCDX: calcola il flusso dei grandi capitali (Bankers)."""
@@ -62,23 +76,29 @@ def main():
     try:
         exchange.load_markets()
         price, news, banker_flow = get_market_data()
-        
-        print(f"--- Report Strategico v3.0 (MCDX) ---")
-        print(f"Banker Flow: {banker_flow:.2f} ({'Balene' if banker_flow > 15 else 'Retail'})")
-        
         decision = get_ai_decision(price, news, banker_flow)
-        print(f"Decisione Finale: {decision}")
-
+        
+        log_msg = f"--- *Report Strategico* ---\n💰 Prezzo: ${price}\n📊 MCDX: {banker_flow:.2f}\n🧠 Decisione: *{decision}*"
+        
         if "COMPRA" in decision:
             order = exchange.create_market_buy_order('BTC/USDT', 500)
-            print(f"🚀 ORDINE ESEGUITO: {order['id']}")
+            msg = f"🚀 *ORDINE ACQUISTO ESEGUITO*\nID: `{order['id']}`\nInvestito: $500\n\n{log_msg}"
+            send_telegram_message(msg)
+            print(msg)
         elif "VENDI" in decision:
             order = exchange.create_market_sell_order('BTC/USDT', 0.005)
-            print(f"📉 VENDITA ESEGUITA: {order['id']}")
+            msg = f"📉 *VENDITA ESEGUITA*\nID: `{order['id']}`\nQuantità: 0.005 BTC\n\n{log_msg}"
+            send_telegram_message(msg)
+            print(msg)
         else:
-            print("💤 L'IA rimane cauta.")
+            # Opzionale: invia un messaggio anche se non opera per sapere che è vivo
+            # send_telegram_message(f"💤 *Nessuna operazione*\n{log_msg}")
+            print("💤 L'IA rimane in attesa.")
+            
     except Exception as e:
-        print(f"Errore: {e}")
+        error_msg = f"❌ *Errore Bot*: {str(e)}"
+        send_telegram_message(error_msg)
+        print(error_msg)
 
 if __name__ == "__main__":
     main()
