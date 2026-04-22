@@ -3,14 +3,15 @@ import ccxt
 from groq import Groq
 from tavily import TavilyClient
 
-# Configurazione Clienti
-groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-tavily = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
+# 1. AGGIORNAMENTO CONFIGURAZIONE
 exchange = ccxt.bitget({
     'apiKey': os.environ.get("BINANCE_API_KEY"),
     'secret': os.environ.get("BINANCE_SECRET_KEY"),
     'password': os.environ.get("BITGET_PASSWORD"),
     'enableRateLimit': True,
+    'options': {
+        'createMarketBuyOrderRequiresPrice': False, # <--- QUESTA RIGA RISOLVE L'ERRORE
+    }
 })
 exchange.set_sandbox_mode(True)
 
@@ -58,14 +59,22 @@ def main():
         decision = get_ai_decision(chart, news, price)
         print(f"L'IA ha deciso: {decision}")
 
+        # 2. AGGIORNAMENTO ORDINI
         if "COMPRA" in decision:
-            order = exchange.create_market_buy_order('BTC/USDT', 0.002) # Circa 150$ di test
-            print(f"🚀 ORDINE ESEGUITO: {order['id']}")
+            # Per Bitget Market Buy, il secondo numero sono i DOLLARI da spendere.
+            # Esempio: investiamo 500 USDT per ogni operazione.
+            budget_per_operazione = 500 
+            order = exchange.create_market_buy_order('BTC/USDT', budget_per_operazione)
+            print(f"🚀 ACQUISTO DI {budget_per_operazione} USDT ESEGUITO! ID: {order['id']}")
+            
         elif "VENDI" in decision:
-            order = exchange.create_market_sell_order('BTC/USDT', 0.002)
-            print(f"📉 VENDITA ESEGUITA: {order['id']}")
+            # Per la vendita invece si usano i BITCOIN. 
+            # Esempio: vendiamo 0.005 BTC (circa 370$ al prezzo attuale)
+            quantita_btc = 0.005
+            order = exchange.create_market_sell_order('BTC/USDT', quantita_btc)
+            print(f"📉 VENDITA DI {quantita_btc} BTC ESEGUITA! ID: {order['id']}")
         else:
-            print("💤 L'IA non vede opportunità né nei grafici né nei social.")
+            print("💤 L'IA non vede opportunità.")
 
     except Exception as e:
         print(f"Errore: {e}")
