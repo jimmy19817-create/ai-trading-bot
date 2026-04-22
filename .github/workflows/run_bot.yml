@@ -22,13 +22,14 @@ jobs:
         uses: actions/setup-python@v6
         with:
           # FONDAMENTALE: Usiamo 3.11 per far funzionare pandas-ta senza errori
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Installazione Librerie
         # Nota: usiamo il trattino 'pandas-ta' per l'installazione, è più sicuro
         run: |
-          pip install --upgrade pip
-          pip install ccxt groq tavily-python pandas pandas-ta
+          python -m pip install --upgrade pip
+          # Blocchiamo pandas alla versione 2.2.2 per evitare conflitti con la 3.0
+          pip install "pandas<3.0" ccxt groq tavily-python pandas-ta
 
       - name: Esecuzione Bot
         env:
