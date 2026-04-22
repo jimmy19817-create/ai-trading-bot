@@ -3,34 +3,38 @@ import ccxt
 from groq import Groq
 from tavily import TavilyClient
 
-# 1. AGGIORNAMENTO CONFIGURAZIONE
+# 1. Inizializzazione Clienti (Le "mani" e il "cervello")
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+tavily = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY"))
+
 exchange = ccxt.bitget({
     'apiKey': os.environ.get("BINANCE_API_KEY"),
     'secret': os.environ.get("BINANCE_SECRET_KEY"),
     'password': os.environ.get("BITGET_PASSWORD"),
     'enableRateLimit': True,
     'options': {
-        'createMarketBuyOrderRequiresPrice': False, # <--- QUESTA RIGA RISOLVE L'ERRORE
+        'createMarketBuyOrderRequiresPrice': False, # Risolve l'errore Bitget
     }
 })
 exchange.set_sandbox_mode(True)
 
 def get_market_context():
-    """Scarica il grafico e le news/social in un colpo solo."""
+    """Recupera il grafico e le news/social."""
     print("Analizzando grafico e trend su X/News...")
-    # 1. Grafico
+    # Recupero grafico ultime 12 ore
     ohlcv = exchange.fetch_ohlcv('BTC/USDT', '1h', limit=12)
     chart = "\n".join([f"Prezzo: {c[4]} USD" for c in ohlcv])
     
-    # 2. Social/News (Il tocco di Grok)
+    # Recupero news e sentiment
     search = tavily.search(query="Bitcoin price sentiment X twitter news latest", search_depth="advanced", max_results=3)
-    context = "\n".join([f"- {r['content'][:200]}" for r in search['results']])
+    news = "\n".join([f"- {r['content'][:200]}" for r in search['results']])
     
-    return chart, context
+    return chart, news
 
 def get_ai_decision(chart, news, price):
+    """L'IA decide la strategia."""
     prompt = f"""
-    SEI UN TRADER AGGRESSIVO TIPO GROK.
+    SEI UN TRADER ESPERTO TIPO GROK.
     PREZZO ATTUALE: {price} USD.
     
     GRAFICO ULTIME 12H:
@@ -39,8 +43,8 @@ def get_ai_decision(chart, news, price):
     NEWS E SENTIMENT SOCIAL (X):
     {news}
     
-    Basandoti su questi dati, devi decidere la mossa per il nostro fondo da 10.000$.
-    Sii proattivo: se le news sono eccitanti, COMPRA. Se c'è paura, VENDI.
+    Analizza i dati e decidi se COMPRARE, VENDI o ATTENDI per il nostro fondo da 10.000$.
+    Sii proattivo e basati sul sentiment.
     Rispondi SOLO con: COMPRA, VENDI o ATTENDI.
     """
     chat = groq_client.chat.completions.create(
@@ -52,29 +56,31 @@ def get_ai_decision(chart, news, price):
 def main():
     try:
         exchange.load_markets()
+        # Otteniamo il prezzo in Dollari come richiesto
         price = exchange.fetch_ticker('BTC/USDT')['last']
+        
         chart, news = get_market_context()
         
         print(f"--- Report Strategico Integrato ---")
+        print(f"Prezzo attuale: ${price}")
+        
         decision = get_ai_decision(chart, news, price)
         print(f"L'IA ha deciso: {decision}")
 
-        # 2. AGGIORNAMENTO ORDINI
         if "COMPRA" in decision:
-            # Per Bitget Market Buy, il secondo numero sono i DOLLARI da spendere.
-            # Esempio: investiamo 500 USDT per ogni operazione.
-            budget_per_operazione = 500 
-            order = exchange.create_market_buy_order('BTC/USDT', budget_per_operazione)
-            print(f"🚀 ACQUISTO DI {budget_per_operazione} USDT ESEGUITO! ID: {order['id']}")
+            # Investiamo 500 Dollari (USDT)
+            budget_usdt = 500 
+            order = exchange.create_market_buy_order('BTC/USDT', budget_usdt)
+            print(f"🚀 ORDINE ACQUISTO ESEGUITO: {order['id']} per {budget_usdt} USDT")
             
         elif "VENDI" in decision:
-            # Per la vendita invece si usano i BITCOIN. 
-            # Esempio: vendiamo 0.005 BTC (circa 370$ al prezzo attuale)
+            # Vendiamo una piccola quantità di BTC (0.005 BTC sono circa 375$)
             quantita_btc = 0.005
             order = exchange.create_market_sell_order('BTC/USDT', quantita_btc)
-            print(f"📉 VENDITA DI {quantita_btc} BTC ESEGUITA! ID: {order['id']}")
+            print(f"📉 VENDITA ESEGUITA: {order['id']} di {quantita_btc} BTC")
+            
         else:
-            print("💤 L'IA non vede opportunità.")
+            print("💤 L'IA suggerisce di non operare al momento.")
 
     except Exception as e:
         print(f"Errore: {e}")
